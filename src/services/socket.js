@@ -8,9 +8,12 @@ export const connectSocket = (callback) => {
   stompClient = Stomp.over(socket);
 
   // Suppress STOMP debug logs
-  stompClient.debug = null;
+  stompClient.debug = () => {};
 
-  stompClient.connect({}, () => {
+  const token = localStorage.getItem("token");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  stompClient.connect(headers, () => {
     stompClient.subscribe("/topic/device", (msg) => {
       callback(JSON.parse(msg.body));
     });
