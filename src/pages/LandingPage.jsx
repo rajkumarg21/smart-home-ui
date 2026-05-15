@@ -4,6 +4,7 @@ import HomeIcon from "@mui/icons-material/Home";
 import SecurityIcon from "@mui/icons-material/Security";
 import BoltIcon from "@mui/icons-material/Bolt";
 import DevicesIcon from "@mui/icons-material/Devices";
+import { useAuth } from "../context/AuthContext";
 
 const features = [
   { icon: <DevicesIcon fontSize="large" color="primary" />, title: "Device Control", desc: "Control all your smart devices from one place." },
@@ -13,6 +14,7 @@ const features = [
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   return (
     <Box>
@@ -38,22 +40,35 @@ function LandingPage() {
           Manage your devices, monitor energy usage, and automate your home — all in one dashboard.
         </Typography>
         <Box sx={{ display: "flex", gap: 2 }}>
-          <Button
-            variant="contained"
-            size="large"
-            sx={{ bgcolor: "white", color: "#1a237e", fontWeight: "bold", "&:hover": { bgcolor: "#e3f2fd" } }}
-            onClick={() => navigate("/signup")}
-          >
-            Get Started
-          </Button>
-          <Button
-            variant="outlined"
-            size="large"
-            sx={{ color: "white", borderColor: "white", "&:hover": { borderColor: "#90caf9" } }}
-            onClick={() => navigate("/login")}
-          >
-            Login
-          </Button>
+          {isAuthenticated ? (
+            <Button
+              variant="contained"
+              size="large"
+              sx={{ bgcolor: "white", color: "#1a237e", fontWeight: "bold", "&:hover": { bgcolor: "#e3f2fd" } }}
+              onClick={() => navigate("/dashboard")}
+            >
+              Go to Dashboard
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="contained"
+                size="large"
+                sx={{ bgcolor: "white", color: "#1a237e", fontWeight: "bold", "&:hover": { bgcolor: "#e3f2fd" } }}
+                onClick={() => navigate("/signup")}
+              >
+                Get Started
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                sx={{ color: "white", borderColor: "white", "&:hover": { borderColor: "#90caf9" } }}
+                onClick={() => navigate("/login")}
+              >
+                Login
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
 
