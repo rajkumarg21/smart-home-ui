@@ -7,6 +7,8 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Automation from "./pages/Automation";
+import UserProfile from "./pages/UserProfile";
+import Devices from "./pages/Devices";
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/automation" element={<Automation />} />
+          <Route path="/profile" element={<UserProfile />} />
+          <Route path="/devices" element={<Devices />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -24,7 +24,11 @@ function Login() {
     setError("");
     try {
       const res = await login(data.username, data.password);
-      setUser({ token: res.token });
+      setUser({
+        token: res.token,
+        username: data.username,
+        email: res.email || localStorage.getItem("email") || null,
+      });
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed. Check your credentials.");

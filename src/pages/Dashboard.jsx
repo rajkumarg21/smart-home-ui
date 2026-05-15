@@ -30,7 +30,8 @@ function Dashboard() {
   const fetchDevices = async () => {
     try {
       const res = await getDevices();
-      setDevices(res.data);
+      const data = res.data?.data ?? res.data;
+      setDevices(Array.isArray(data) ? data : []);
     } catch (err) {
       setError("Failed to load devices. Make sure the backend is running.");
     } finally {
