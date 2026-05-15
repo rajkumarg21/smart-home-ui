@@ -8,9 +8,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const username = localStorage.getItem("username");
-    const email = localStorage.getItem("email");
+    const token = sessionStorage.getItem("token");
+    const username = sessionStorage.getItem("username");
+    const email = sessionStorage.getItem("email");
 
     console.log("[AuthContext] useEffect - localStorage token:", token);
     console.log("[AuthContext] useEffect - localStorage username:", username);

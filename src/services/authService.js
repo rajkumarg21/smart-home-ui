@@ -13,9 +13,9 @@ export const login = async (username, password) => {
   console.log("[authService] Resolved token:", token);
   console.log("[authService] Email from authData:", authData.email ?? "not present");
 
-  if (token) localStorage.setItem("token", token);
-  localStorage.setItem("username", username);
-  if (authData.email) localStorage.setItem("email", authData.email);
+  if (token) sessionStorage.setItem("token", token);
+  sessionStorage.setItem("username", username);
+  if (authData.email) sessionStorage.setItem("email", authData.email);
 
   return { ...authData, token };
 };
@@ -27,15 +27,15 @@ export const signup = async (username, password, email) => {
 };
 
 export const logout = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("username");
-  localStorage.removeItem("email");
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("username");
+  sessionStorage.removeItem("email");
   window.location.href = "/login";
 };
 
-export const getToken = () => localStorage.getItem("token");
+export const getToken = () => sessionStorage.getItem("token");
 
 export const isAuthenticated = () => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
   return !!token && token !== "undefined" && token !== "null";
 };

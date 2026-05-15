@@ -14,11 +14,6 @@ function UserProfile() {
   const { user, handleLogout } = useAuth();
   const navigate = useNavigate();
 
-  // Debug: log raw localStorage values
-  console.log("[UserProfile] localStorage token:", localStorage.getItem("token"));
-  console.log("[UserProfile] localStorage username:", localStorage.getItem("username"));
-  console.log("[UserProfile] localStorage email:", localStorage.getItem("email"));
-  console.log("[UserProfile] user object from context:", user);
 
   const initials = user?.username
     ? user.username.charAt(0).toUpperCase()
@@ -33,12 +28,8 @@ function UserProfile() {
         return null;
       }
 
-      console.log("[UserProfile] Raw token value:", token);
-      console.log("[UserProfile] username from context:", user?.username);
-      console.log("[UserProfile] email from context:", user?.email);
 
       const parts = token.split(".");
-      console.log("[UserProfile] Token parts count:", parts.length);
 
       if (parts.length !== 3) {
         console.warn("[UserProfile] Token is not a valid JWT (expected 3 parts, got", parts.length, ")");

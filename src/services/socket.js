@@ -4,7 +4,7 @@ import { Client } from "@stomp/stompjs";
 let stompClient = null;
 
 export const connectSocket = (callback) => {
-  const token = localStorage.getItem("token");
+  const token = sessionStorage.getItem("token");
 
   stompClient = new Client({
     // SockJS factory
