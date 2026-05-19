@@ -6,6 +6,7 @@ import {
   Alert, Tooltip, Divider,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
@@ -13,7 +14,8 @@ import AcUnitIcon from "@mui/icons-material/AcUnit";
 import LockIcon from "@mui/icons-material/Lock";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import DevicesOtherIcon from "@mui/icons-material/DevicesOther";
-import { getDevices, addDevice, deleteDevice, controlDevice } from "../services/deviceService";
+import { getDevices, addDevice, deleteDevice, controlDevice, aiControlDevice } from "../services/deviceService";
+import { connectSocket, disconnectSocket } from "../services/socket";
 
 const DEVICE_TYPES = ["LIGHT", "FAN", "AC", "LOCK", "CAMERA", "OTHER"];
 
@@ -38,6 +40,10 @@ function Devices() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving]       = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [aiCommand, setAiCommand] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
+  const [aiMetrics, setAiMetrics] = useState([]);
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -48,13 +54,25 @@ function Devices() {
       const data = res.data?.data ?? res.data;
       setDevices(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError("Failed to load devices. Make sure the backend is running.");
+      setError(err.response?.status === 401
+        ? "Please log in to load your devices."
+        : "Failed to load devices. Make sure the backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchDevices(); }, []);
+  useEffect(() => {
+    fetchDevices();
+    connectSocket((updatedDevice) => {
+      setDevices((prev) =>
+        prev.map((device) => device.id === updatedDevice.id ? updatedDevice : device)
+      );
+      setAiResult(`${updatedDevice.name} is now ${updatedDevice.status}`);
+    });
+
+    return () => disconnectSocket();
+  }, []);
 
   const handleOpenDialog = () => {
     setForm(emptyForm);
@@ -105,6 +123,39 @@ function Devices() {
     }
   };
 
+  const handleAiCommand = async () => {
+    const command = aiCommand.trim();
+    if (!command) {
+      setError("Enter a device command first.");
+      return;
+    }
+
+    setAiLoading(true);
+    setError("");
+    setAiResult("");
+    setAiMetrics([]);
+    try {
+      const res = await aiControlDevice(command);
+      const data = res.data?.data;
+      const affectedDevices = data?.affectedDevices || [];
+
+      if (affectedDevices.length) {
+        setDevices((prev) =>
+          prev.map((device) => affectedDevices.find((updated) => updated.id === device.id) || device)
+        );
+      }
+      setAiResult(data?.message || res.data?.message || "Command executed.");
+      setAiMetrics(data?.metrics || []);
+      setAiCommand("");
+    } catch (err) {
+      setError(err.response?.status === 401
+        ? "Please log in to run AI device commands."
+        : err.response?.data?.message || "AI command could not be executed.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ minHeight: "90vh", background: "linear-gradient(135deg, #e3f2fd, #f5f5f5)", p: 4 }}>
       {/* Header */}
@@ -128,6 +179,57 @@ function Devices() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>{error}</Alert>}
+
+      <Paper
+        elevation={2}
+        sx={{
+          p: 2,
+          mb: 3,
+          borderRadius: 2,
+          display: "flex",
+          gap: 1.5,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <AutoAwesomeIcon color="primary" />
+        <TextField
+          size="small"
+          label="AI device command"
+          placeholder="Turn on living room light"
+          value={aiCommand}
+          onChange={(event) => setAiCommand(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") handleAiCommand();
+          }}
+          sx={{ flex: "1 1 320px" }}
+        />
+        <Button
+          variant="contained"
+          startIcon={aiLoading ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+          onClick={handleAiCommand}
+          disabled={aiLoading}
+          sx={{ borderRadius: 2, px: 3, minWidth: 150 }}
+        >
+          Run Command
+        </Button>
+        {aiResult && (
+          <Alert severity="success" sx={{ width: "100%", mt: 1 }} onClose={() => setAiResult("")}>
+            {aiResult}
+          </Alert>
+        )}
+        {aiMetrics.length > 0 && (
+          <Box sx={{ width: "100%", display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+            {aiMetrics.map((metric) => (
+              <Chip
+                key={metric.deviceId}
+                variant="outlined"
+                label={`${metric.deviceName}: ${metric.runtimeMinutes} min, ${metric.energyKwh} kWh`}
+              />
+            ))}
+          </Box>
+        )}
+      </Paper>
 
       {/* Device list */}
       {loading ? (
