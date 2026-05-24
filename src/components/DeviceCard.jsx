@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Card, CardContent, CardActions, Typography, Button,
-  Chip, Box, Slider, Switch, FormControlLabel
+  Chip, Box, Slider
 } from "@mui/material";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 import AcUnitIcon from "@mui/icons-material/AcUnit";

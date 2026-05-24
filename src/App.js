@@ -10,6 +10,8 @@ import Analytics from "./pages/Analytics";
 import Automation from "./pages/Automation";
 import UserProfile from "./pages/UserProfile";
 import Devices from "./pages/Devices";
+import Predictions from "./pages/Predictions";
+import EnergyOptimization from "./pages/EnergyOptimization";
 import Footer from "./components/Footer";
 
 function App() {
@@ -28,6 +30,8 @@ function App() {
               <Route path="/automation" element={<Automation />} />
               <Route path="/profile" element={<UserProfile />} />
               <Route path="/devices" element={<Devices />} />
+              <Route path="/predictions" element={<Predictions />} />
+              <Route path="/energy" element={<EnergyOptimization />} />
             </Routes>
           </Box>
           <Footer />

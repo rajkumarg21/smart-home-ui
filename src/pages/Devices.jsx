@@ -6,14 +6,17 @@ import {
   Alert, Tooltip, Divider,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import LightbulbIcon from "@mui/icons-material/Lightbulb";
 import AcUnitIcon from "@mui/icons-material/AcUnit";
 import LockIcon from "@mui/icons-material/Lock";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import DevicesOtherIcon from "@mui/icons-material/DevicesOther";
-import { getDevices, addDevice, deleteDevice, controlDevice } from "../services/deviceService";
+import { getDevices, addDevice, updateDevice, deleteDevice, controlDevice, aiControlDevice } from "../services/deviceService";
+import { connectSocket, disconnectSocket } from "../services/socket";
 
 const DEVICE_TYPES = ["LIGHT", "FAN", "AC", "LOCK", "CAMERA", "OTHER"];
 
@@ -27,17 +30,33 @@ const deviceIcon = (type) => {
   }
 };
 
-const emptyForm = { name: "", type: "LIGHT", location: "", metadata: "" };
+const emptyForm = {
+  name: "",
+  type: "LIGHT",
+  location: "",
+  metadata: "",
+  company: "",
+  watt: "",
+  brightness: "",
+  speed: "",
+  temperature: "",
+};
 
 function Devices() {
   const [devices, setDevices]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState(null);
   const [form, setForm]           = useState(emptyForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving]       = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+  const [aiCommand, setAiCommand] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState("");
+  const [aiMetrics, setAiMetrics] = useState([]);
+  const [aiConfigs, setAiConfigs] = useState([]);
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -48,16 +67,46 @@ function Devices() {
       const data = res.data?.data ?? res.data;
       setDevices(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError("Failed to load devices. Make sure the backend is running.");
+      setError(err.response?.status === 401
+        ? "Please log in to load your devices."
+        : "Failed to load devices. Make sure the backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchDevices(); }, []);
+  useEffect(() => {
+    fetchDevices();
+    connectSocket((updatedDevice) => {
+      setDevices((prev) =>
+        prev.map((device) => device.id === updatedDevice.id ? updatedDevice : device)
+      );
+      setAiResult(`${updatedDevice.name} is now ${updatedDevice.status}`);
+    });
+
+    return () => disconnectSocket();
+  }, []);
 
   const handleOpenDialog = () => {
+    setEditingDevice(null);
     setForm(emptyForm);
+    setFormError("");
+    setDialogOpen(true);
+  };
+
+  const handleEditOpen = (device) => {
+    setEditingDevice(device);
+    setForm({
+      name: device.name || "",
+      type: device.type || "LIGHT",
+      location: device.location || "",
+      metadata: device.metadata || "",
+      company: device.company || "",
+      watt: device.watt ?? "",
+      brightness: device.brightness ?? "",
+      speed: device.speed ?? "",
+      temperature: device.temperature ?? "",
+    });
     setFormError("");
     setDialogOpen(true);
   };
@@ -65,17 +114,33 @@ function Devices() {
   const handleFormChange = (e) =>
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleAddDevice = async () => {
+  const handleSaveDevice = async () => {
     if (!form.name.trim()) { setFormError("Device name is required."); return; }
     if (!form.type)        { setFormError("Device type is required."); return; }
     setSaving(true);
     setFormError("");
+    const payload = {
+      ...form,
+      watt: form.watt === "" ? null : Number(form.watt),
+      brightness: form.brightness === "" ? null : Number(form.brightness),
+      speed: form.speed === "" ? null : Number(form.speed),
+      temperature: form.temperature === "" ? null : Number(form.temperature),
+    };
+
     try {
-      await addDevice(form);
+      const res = editingDevice
+        ? await updateDevice(editingDevice.id, payload)
+        : await addDevice(payload);
+      const savedDevice = res.data?.data;
       setDialogOpen(false);
-      fetchDevices();
+      setEditingDevice(null);
+      if (editingDevice && savedDevice) {
+        setDevices((prev) => prev.map((device) => device.id === savedDevice.id ? savedDevice : device));
+      } else {
+        fetchDevices();
+      }
     } catch (err) {
-      setFormError(err.response?.data?.message || "Failed to add device.");
+      setFormError(err.response?.data?.message || `Failed to ${editingDevice ? "update" : "add"} device.`);
     } finally {
       setSaving(false);
     }
@@ -105,6 +170,41 @@ function Devices() {
     }
   };
 
+  const handleAiCommand = async () => {
+    const command = aiCommand.trim();
+    if (!command) {
+      setError("Enter a device command first.");
+      return;
+    }
+
+    setAiLoading(true);
+    setError("");
+    setAiResult("");
+    setAiMetrics([]);
+    setAiConfigs([]);
+    try {
+      const res = await aiControlDevice(command);
+      const data = res.data?.data;
+      const affectedDevices = data?.affectedDevices || [];
+
+      if (affectedDevices.length) {
+        setDevices((prev) =>
+          prev.map((device) => affectedDevices.find((updated) => updated.id === device.id) || device)
+        );
+      }
+      setAiResult(data?.message || res.data?.message || "Command executed.");
+      setAiMetrics(data?.metrics || []);
+      setAiConfigs(data?.deviceConfigs || []);
+      setAiCommand("");
+    } catch (err) {
+      setError(err.response?.status === 401
+        ? "Please log in to run AI device commands."
+        : err.response?.data?.message || "AI command could not be executed.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ minHeight: "90vh", background: "linear-gradient(135deg, #e3f2fd, #f5f5f5)", p: 4 }}>
       {/* Header */}
@@ -128,6 +228,68 @@ function Devices() {
       </Box>
 
       {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError("")}>{error}</Alert>}
+
+      <Paper
+        elevation={2}
+        sx={{
+          p: 2,
+          mb: 3,
+          borderRadius: 2,
+          display: "flex",
+          gap: 1.5,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}
+      >
+        <AutoAwesomeIcon color="primary" />
+        <TextField
+          size="small"
+          label="AI device command"
+          placeholder="Turn on living room light"
+          value={aiCommand}
+          onChange={(event) => setAiCommand(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") handleAiCommand();
+          }}
+          sx={{ flex: "1 1 320px" }}
+        />
+        <Button
+          variant="contained"
+          startIcon={aiLoading ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
+          onClick={handleAiCommand}
+          disabled={aiLoading}
+          sx={{ borderRadius: 2, px: 3, minWidth: 150 }}
+        >
+          Run Command
+        </Button>
+        {aiResult && (
+          <Alert severity="success" sx={{ width: "100%", mt: 1 }} onClose={() => setAiResult("")}>
+            {aiResult}
+          </Alert>
+        )}
+        {aiMetrics.length > 0 && (
+          <Box sx={{ width: "100%", display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+            {aiMetrics.map((metric) => (
+              <Chip
+                key={metric.deviceId}
+                variant="outlined"
+                label={`${metric.deviceName}: ${metric.runtimeMinutes} min, ${metric.energyKwh} kWh`}
+              />
+            ))}
+          </Box>
+        )}
+        {aiConfigs.length > 0 && (
+          <Box sx={{ width: "100%", display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+            {aiConfigs.map((config) => (
+              <Chip
+                key={config.deviceId}
+                variant="outlined"
+                label={`${config.deviceName}: ${config.status}, ${config.location || "No location"}, ${config.watt ?? "-"}W`}
+              />
+            ))}
+          </Box>
+        )}
+      </Paper>
 
       {/* Device list */}
       {loading ? (
@@ -213,6 +375,14 @@ function Devices() {
                     </Typography>
                   )}
 
+                  <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mb: 1.5 }}>
+                    {device.company && <Chip label={device.company} size="small" />}
+                    {device.watt != null && <Chip label={`${device.watt}W`} size="small" />}
+                    {device.brightness != null && <Chip label={`${device.brightness}%`} size="small" />}
+                    {device.speed != null && <Chip label={`Speed ${device.speed}`} size="small" />}
+                    {device.temperature != null && <Chip label={`${device.temperature}C`} size="small" />}
+                  </Box>
+
                   <Divider sx={{ mb: 1.5 }} />
 
                   {/* Actions */}
@@ -235,15 +405,27 @@ function Devices() {
                       </span>
                     </Tooltip>
 
-                    <Tooltip title="Delete device">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDelete(device.id)}
-                        sx={{ color: "#ef5350", "&:hover": { bgcolor: "#ffebee" } }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    <Box>
+                      <Tooltip title="Edit device">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditOpen(device)}
+                          sx={{ color: "#1976d2", "&:hover": { bgcolor: "#e3f2fd" } }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Delete device">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(device.id)}
+                          sx={{ color: "#ef5350", "&:hover": { bgcolor: "#ffebee" } }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </Box>
                 </Box>
               </Paper>
@@ -252,10 +434,12 @@ function Devices() {
         </Grid>
       )}
 
-      {/* Add Device Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth
+      {/* Add/Edit Device Dialog */}
+      <Dialog open={dialogOpen} onClose={() => { setDialogOpen(false); setEditingDevice(null); }} maxWidth="sm" fullWidth
         PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ fontWeight: "bold", pb: 1 }}>Add New Device</DialogTitle>
+        <DialogTitle sx={{ fontWeight: "bold", pb: 1 }}>
+          {editingDevice ? "Edit Device" : "Add New Device"}
+        </DialogTitle>
         <Divider />
         <DialogContent sx={{ pt: 2 }}>
           {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
@@ -290,14 +474,49 @@ function Devices() {
             margin="normal"
             placeholder="e.g. brightness=80, temp=22"
           />
+
+          <TextField
+            fullWidth label="Company" name="company"
+            value={form.company} onChange={handleFormChange}
+            margin="normal"
+            placeholder="e.g. Philips, Havells, LG"
+          />
+
+          <TextField
+            fullWidth label="Watt" name="watt" type="number"
+            value={form.watt} onChange={handleFormChange}
+            margin="normal"
+            placeholder="e.g. 12, 75, 1500"
+          />
+
+          <TextField
+            fullWidth label="Brightness %" name="brightness" type="number"
+            value={form.brightness} onChange={handleFormChange}
+            margin="normal"
+            placeholder="For lights, e.g. 80"
+          />
+
+          <TextField
+            fullWidth label="Fan Speed" name="speed" type="number"
+            value={form.speed} onChange={handleFormChange}
+            margin="normal"
+            placeholder="For fans, e.g. 3"
+          />
+
+          <TextField
+            fullWidth label="AC Temperature" name="temperature" type="number"
+            value={form.temperature} onChange={handleFormChange}
+            margin="normal"
+            placeholder="For AC, e.g. 24"
+          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => { setDialogOpen(false); setEditingDevice(null); }} disabled={saving}>Cancel</Button>
           <Button
-            variant="contained" onClick={handleAddDevice} disabled={saving}
+            variant="contained" onClick={handleSaveDevice} disabled={saving}
             sx={{ borderRadius: 2, px: 3, background: "linear-gradient(90deg, #1a237e, #0d47a1)" }}
           >
-            {saving ? <CircularProgress size={20} color="inherit" /> : "Add Device"}
+            {saving ? <CircularProgress size={20} color="inherit" /> : editingDevice ? "Update Device" : "Add Device"}
           </Button>
         </DialogActions>
       </Dialog>
