@@ -16,8 +16,10 @@ function Analytics() {
   useEffect(() => {
     getDevices()
       .then((res) => {
-        setDevices(res.data);
-        if (res.data.length > 0) setSelectedDevice(res.data[0].id);
+        const data = res.data?.data ?? res.data;
+        const list = Array.isArray(data) ? data : [];
+        setDevices(list);
+        if (list.length > 0) setSelectedDevice(list[0].id);
       })
       .catch(() => setError("Failed to load devices."));
   }, []);
@@ -26,7 +28,10 @@ function Analytics() {
     if (!selectedDevice) return;
     setLoading(true);
     getDeviceAnalytics(selectedDevice)
-      .then((res) => setChartData(res.data))
+      .then((res) => {
+        const data = res.data?.data ?? res.data;
+        setChartData(Array.isArray(data) ? data : []);
+      })
       .catch(() => setError("Failed to load analytics data."))
       .finally(() => setLoading(false));
   }, [selectedDevice]);
