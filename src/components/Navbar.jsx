@@ -51,6 +51,8 @@ function Navbar() {
               <Button color="inherit" onClick={() => navigate("/analytics")}>Analytics</Button>
               <Button color="inherit" onClick={() => navigate("/automation")}>Automation</Button>
               <Button color="inherit" onClick={() => navigate("/devices")}>Devices</Button>
+              <Button color="inherit" onClick={() => navigate("/predictions")}>Predictions</Button>
+              <Button color="inherit" onClick={() => navigate("/energy")}>Energy</Button>
 
               {/* User Avatar with dropdown */}
               <Tooltip title={user?.username || "Account"}>

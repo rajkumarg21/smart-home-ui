@@ -16,5 +16,21 @@ export const getDeviceAnalytics = (deviceId) =>
 
 export const addDevice = (deviceData) => API.post("/device/add", deviceData);
 
+export const updateDevice = (deviceId, deviceData) =>
+  API.put(`/device/update/${deviceId}`, deviceData);
+
 export const deleteDevice = (deviceId) =>
   API.delete(`/device/delete/${deviceId}`);
+
+// ── AI Predictive Automation ──────────────────────────────────────────────────
+export const getPredictions = () => API.get("/predictions");
+
+export const applyPrediction = (deviceId, action) =>
+  API.post("/predictions/apply", { deviceId, action });
+
+// ── Smart Energy Optimization Engine ─────────────────────────────────────────
+export const getEnergyReport = (period = "TODAY", tariff = null) => {
+  const params = { period };
+  if (tariff) params.tariff = tariff;
+  return API.get("/energy/report", { params });
+};
