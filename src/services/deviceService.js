@@ -8,6 +8,9 @@ export const controlDevice = (deviceId, action) =>
 export const aiControlDevice = (command) =>
   API.post("/ai/device-command", { command });
 
+export const generateAiUsageReport = (period = "TODAY", notifyUser = true) =>
+  API.post("/ai/usage-report", { period, notifyUser });
+
 export const reportDeviceStatus = (deviceId, status) =>
   API.put("/device/status", { deviceId, status });
 
